@@ -3,7 +3,7 @@ from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 
 from api.mixins import ListCreateViewSet, PerformCreateUserMixin
-from api.permissions import IsAuthorOrReadOnly
+from api.permissions import IsAuthenticatedAuthorOrReadOnly
 from api.serializers import (
     CommentSerializer,
     FollowSerializer,
@@ -18,7 +18,7 @@ class PostViewSet(PerformCreateUserMixin, viewsets.ModelViewSet):
 
     queryset = Post.objects.select_related("author", "group")
     serializer_class = PostSerializer
-    permission_classes = (IsAuthorOrReadOnly,)
+    permission_classes = (IsAuthenticatedAuthorOrReadOnly,)
     pagination_class = LimitOffsetPagination
     user_field_name = "author"
 
@@ -35,7 +35,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     """ViewSet для обработки комментариев (Comment)."""
 
     serializer_class = CommentSerializer
-    permission_classes = (IsAuthorOrReadOnly,)
+    permission_classes = (IsAuthenticatedAuthorOrReadOnly,)
 
     def get_post(self):
         return get_object_or_404(Post, pk=self.kwargs.get("post_id"))
@@ -58,3 +58,6 @@ class FollowViewSet(PerformCreateUserMixin, ListCreateViewSet):
 
     def get_queryset(self):
         return self.request.user.follower.select_related("following")
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

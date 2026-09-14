@@ -1,7 +1,12 @@
 from rest_framework import permissions
 
 
-class IsAuthorOrReadOnly(permissions.BasePermission):
+class IsAuthenticatedAuthorOrReadOnly(permissions.BasePermission):
+    """
+    Разрешает чтение всем, а создание/изменение — только
+    аутентифицированному автору.
+    """
+
     def has_permission(self, request, view):
         return (
             request.method in permissions.SAFE_METHODS
