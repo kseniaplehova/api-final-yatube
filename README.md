@@ -1,154 +1,90 @@
-# Проект Yatube API
+# Yatube API (final)
 
-### Описание
+REST API for Yatube, a small social network: posts, groups, comments and author subscriptions, with JWT authentication.
 
-REST API для социальной сети Yatube. Проект позволяет управлять публикациями, группами и комментариями через HTTP-запросы. Пользователи могут получать список постов и комментариев, а авторизованные пользователи — создавать новые записи, редактировать и удалять собственный контент. Аутентификация реализована с использованием JWT-токенов (Djoser + SimpleJWT).
+> Educational project — Yandex Practicum, Python Developer course.
 
-### Технологический стек
+## Features
 
-* **Python** 3.9+
-* **Django** 3.2+
-* **Django REST Framework** (DRF)
-* **Djoser / Simple-JWT** (JWT-аутентификация)
+- **JWT authentication** via Djoser + Simple JWT (`Authorization: Bearer <access>`); user registration through Djoser endpoints.
+- **Posts**: full CRUD, optional image upload and optional group; author is set automatically from the token.
+- **Groups**: read-only (list and detail).
+- **Comments**: full CRUD nested under a post (`/posts/{post_id}/comments/`).
+- **Follows**: list the current user's subscriptions and subscribe to an author; supports search by the followed username (`?search=`). Validation forbids following yourself and duplicate subscriptions (plus a DB-level unique constraint).
+- **Permissions**: anyone can read; creating requires authentication; editing and deleting posts and comments is allowed only to their author (custom `IsAuthenticatedAuthorOrReadOnly`). Subscriptions are available to authenticated users only.
+- **Pagination**: `limit` / `offset` on the posts list.
+- ReDoc API documentation served at `/redoc/`.
 
----
+## Endpoints
 
-### Как запустить проект локально
+All paths are prefixed with `/api/v1/`.
 
-1. **Клонировать репозиторий и перейти в него:**
+| Method | Path | Description |
+| --- | --- | --- |
+| POST | `users/` | Register a user (Djoser) |
+| POST | `jwt/create/`, `jwt/refresh/`, `jwt/verify/` | Obtain, refresh, verify JWT |
+| GET, POST | `posts/` | List (optionally paginated) / create posts |
+| GET, PUT, PATCH, DELETE | `posts/{id}/` | Post detail (write: author only) |
+| GET | `groups/`, `groups/{id}/` | Groups |
+| GET, POST | `posts/{post_id}/comments/` | Comments of a post |
+| GET, PUT, PATCH, DELETE | `posts/{post_id}/comments/{id}/` | Comment detail (write: author only) |
+| GET, POST | `follow/` | Own subscriptions / follow an author |
 
-   ```bash
-   git clone https://github.com/yandex-praktikum/api-final-yatube
+## Tech stack
+
+- Python, Django 5.1.1, Django REST Framework 3.15.2
+- Djoser 2.3.1, djangorestframework-simplejwt 5.4.0
+- SQLite, Pillow 11.0.0
+- pytest 8.3.3, pytest-django 4.9.0, flake8
+
+## Getting started
+
+```bash
+git clone https://github.com/kseniaplehova/api-final-yatube.git
 cd api-final-yatube
-   ```
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cd yatube_api
+python manage.py migrate
+python manage.py runserver
+```
 
-2. **Создать и активировать виртуальное окружение:**
+The API is then available at `http://127.0.0.1:8000/api/v1/`, documentation at `http://127.0.0.1:8000/redoc/`.
 
-   *Linux / macOS:*
-
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-   *Windows (PowerShell):*
-
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-
-3. **Установить зависимости:**
-
-   ```bash
-   python -m pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-
-4. **Выполнить миграции:**
-
-   ```bash
-   python manage.py migrate
-   ```
-
-5. **Создать суперпользователя (администратора):**
-
-   ```bash
-   python manage.py createsuperuser
-   ```
-
-6. **Запустить сервер разработки:**
-
-   ```bash
-   python manage.py runserver
-   ```
-
-   Сервер запустится по адресу: http://127.0.0.1:8000/
-
----
-
-### Сценарий работы с API (регистрация и выполнение запросов)
-
-После запуска сервера выполните шаги ниже (через cURL, Postman или Insomnia), чтобы зарегистрироваться, получить JWT-токен и выполнить запросы к API.
-
-#### Шаг 1. Регистрация нового пользователя
-
-Отправьте POST-запрос на эндпоинт `/api/v1/users/`:
+## Usage example
 
 ```bash
+# register
 curl -X POST http://127.0.0.1:8000/api/v1/users/ \
-     -H "Content-Type: application/json" \
-     -d '{"username": "test_user", "password": "your_password_123"}'
-```
+  -H "Content-Type: application/json" \
+  -d '{"username": "test_user", "password": "your_password_123"}'
 
-Ответ сервера (201 Created):
-
-```json
-{
-    "email": "",
-    "id": 1,
-    "username": "test_user"
-}
-```
-
-#### Шаг 2. Получение JWT-токена
-
-Для аутентификации и выполнения запросов получите access-токен:
-
-```bash
+# get a token
 curl -X POST http://127.0.0.1:8000/api/v1/jwt/create/ \
-     -H "Content-Type: application/json" \
-     -d '{"username": "test_user", "password": "your_password_123"}'
-```
+  -H "Content-Type: application/json" \
+  -d '{"username": "test_user", "password": "your_password_123"}'
 
-Ответ сервера (200 OK):
-
-```json
-{
-    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-Скопируйте значение поля `access`.
-
-#### Шаг 3. Выполнение авторизованных запросов
-
-Передавайте полученный токен в заголовке `Authorization` с префиксом `Bearer`:
-
-**Создание поста:**
-
-```bash
+# create a post
 curl -X POST http://127.0.0.1:8000/api/v1/posts/ \
-     -H "Authorization: Bearer <ваш_access_token>" \
-     -H "Content-Type: application/json" \
-     -d '{"text": "Мой первый пост через Yatube API!"}'
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "My first post"}'
+
+# paginated list (no token needed)
+curl "http://127.0.0.1:8000/api/v1/posts/?limit=10&offset=0"
 ```
 
-Ответ сервера (201 Created):
+## Tests
 
-```json
-{
-    "id": 1,
-    "author": "test_user",
-    "text": "Мой первый пост через Yatube API!",
-    "pub_date": "2026-03-30T12:00:00Z",
-    "image": null,
-    "group": null
-}
-```
-
-**Получение списка постов (доступно без токена):**
+From the repository root:
 
 ```bash
-curl -X GET http://127.0.0.1:8000/api/v1/posts/
+pytest
 ```
 
-**Подписка на автора:**
+The `tests/` directory covers JWT, posts, groups, comments and follows. A Postman collection is available in `postman_collection/`.
 
-```bash
-curl -X POST http://127.0.0.1:8000/api/v1/follow/ \
-     -H "Authorization: Bearer <ваш_access_token>" \
-     -H "Content-Type: application/json" \
-     -d '{"following": "author_username"}'
-```
+## Author
+
+Ksenia Plehova — [GitHub](https://github.com/kseniaplehova)
